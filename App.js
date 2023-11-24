@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
 
 export default function App() {
@@ -12,6 +12,8 @@ export default function App() {
   const [scanFrequency, setScanFrequency] = useState(null);
   const frequencies = [{ label: '30s', value: 30000 }, { label: '5m', value: 300000 }, { label: '10m', value: 600000 },{ label: '30m', value: 1800000 }];
   const [scanComplete, setScanComplete] = useState(false); // New state
+  const [selectedFrequency, setSelectedFrequency] = useState(null);
+
 
   useEffect(() => {
     (async () => {
@@ -53,7 +55,10 @@ export default function App() {
   if (hasPermission === false) {
     return <Text>No access to camera</Text>;
   }
-
+  const handleFrequencySelect = (value) => {
+    setScanFrequency(value);
+    setSelectedFrequency(value); // Update the selected frequency
+  };
   return (
     <View style={styles.container}>
       <Camera 
@@ -88,7 +93,11 @@ export default function App() {
       </View>
       <View style={styles.frequencyContainer}>
         {frequencies.map(freq => (
-          <TouchableOpacity key={freq.value} onPress={() => setScanFrequency(freq.value)} style={styles.freqButton}>
+          <TouchableOpacity
+            key={freq.value}
+            onPress={() => handleFrequencySelect(freq.value)}
+            style={selectedFrequency === freq.value ? styles.freqButtonSelected : styles.freqButton}
+          >
             <Text style={styles.freqText}>{freq.label}</Text>
           </TouchableOpacity>
         ))}
@@ -163,6 +172,12 @@ const styles = StyleSheet.create({
   },
   freqButton: {
     backgroundColor: '#ddd',
+    padding: 10,
+    margin: 5,
+    borderRadius: 5,
+  },
+  freqButtonSelected: {
+    backgroundColor: '#aaa', // Different color to indicate selection
     padding: 10,
     margin: 5,
     borderRadius: 5,
