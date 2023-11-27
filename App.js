@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 export default function App() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -13,7 +15,17 @@ export default function App() {
   const frequencies = [{ label: '30s', value: 30000 }, { label: '5m', value: 300000 }, { label: '10m', value: 600000 },{ label: '30m', value: 1800000 }];
   const [scanComplete, setScanComplete] = useState(false); // New state
   const [selectedFrequency, setSelectedFrequency] = useState(null);
-
+  const getFinnishTimestamp = () => {
+    return new Intl.DateTimeFormat('fi-FI', {
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit'
+    }).format(new Date());
+  };
+  
 
   useEffect(() => {
     (async () => {
@@ -41,12 +53,45 @@ export default function App() {
     setScanned(true);
     setScannedData(data);
     let isValid = data === defaultValidationData || data === userValidationData;
+    
+    // Record the scan event
+    recordScanEvent(data, isValid);
+  
     Alert.alert('Barcode Scanned', `Type: ${type}\nData: ${data}\nMatch: ${isValid ? 'Valid' : 'Invalid'}`);
   };
 
   const initiateScan = () => {
     setScanned(false); // Reset scanned state to allow a new scan
   };
+
+  const [isSharing, setIsSharing] = useState(false); // State to track sharing status
+
+const exportLogFile = async () => {
+  if (isSharing) {
+    console.log('A share request is already in progress.');
+    return;
+  }
+
+  setIsSharing(true); // Set sharing status to true
+
+  const logFileName = 'scan_events.txt';
+  const logFilePath = `${FileSystem.documentDirectory}${logFileName}`;
+
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      Alert.alert("Sharing not available", "Unable to share files on this device.");
+      setIsSharing(false); // Reset sharing status
+      return;
+    }
+
+    await Sharing.shareAsync(logFilePath);
+  } catch (error) {
+    console.error('Error sharing log file:', error);
+    Alert.alert("Export Error", "There was an error exporting the log file.");
+  } finally {
+    setIsSharing(false); // Reset sharing status regardless of outcome
+  }
+};
 
 
   if (hasPermission === null) {
@@ -56,9 +101,40 @@ export default function App() {
     return <Text>No access to camera</Text>;
   }
   const handleFrequencySelect = (value) => {
-    setScanFrequency(value);
-    setSelectedFrequency(value); // Update the selected frequency
+    if (scanFrequency === value) {
+      // If the selected frequency is already active, disable scanning
+      setScanFrequency(null);
+      setSelectedFrequency(null);
+    } else {
+      // Otherwise, activate the selected frequency
+      setScanFrequency(value);
+      setSelectedFrequency(value);
+    }
   };
+
+  const recordScanEvent = async (data, isValid) => {
+    const logFileName = 'scan_events.txt';
+    const logFilePath = `${FileSystem.documentDirectory}${logFileName}`;
+    const timestamp = getFinnishTimestamp(); // Finnish formatted timestamp
+    const newLogEntry = `${timestamp}, Status: ${isValid ? 'Valid' : 'Invalid'}, Data: ${data}\n`;
+  
+    try {
+      // Read existing content
+      const existingContent = await FileSystem.readAsStringAsync(logFilePath)
+        .catch(() => ''); // If the file doesn't exist, start with an empty string
+  
+      // Concatenate new entry with existing content
+      const updatedContent = existingContent + newLogEntry;
+  
+      // Write the updated content back to the file
+      await FileSystem.writeAsStringAsync(logFilePath, updatedContent);
+    } catch (error) {
+      console.error('Error writing scan event:', error);
+    }
+  };
+  
+  
+
   return (
     <View style={styles.container}>
       <Camera 
@@ -79,18 +155,26 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </Camera>
+      
       <View style={styles.controlPanel}>
         <TextInput
           style={styles.input}
           onChangeText={setUserValidationData}
           value={userValidationData}
-          placeholder="Enter validation data"
+          placeholder="Enter validation data. Testikoodi is set as default."
         />
         {scanned && <Text style={styles.barcodeText}>Scanned Data: {scannedData}</Text>}
+      </View>
+  
+      <View style={styles.buttonRow}>
         <TouchableOpacity onPress={initiateScan} style={styles.scanButton}>
-          <Text style={styles.text}>Scan once</Text>
+          <Text style={styles.buttonText}>Scan Once</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={exportLogFile} style={styles.exportButton}>
+          <Text style={styles.buttonText}>Export Log File</Text>
         </TouchableOpacity>
       </View>
+  
       <View style={styles.frequencyContainer}>
         {frequencies.map(freq => (
           <TouchableOpacity
@@ -104,7 +188,7 @@ export default function App() {
       </View>
     </View>
   );
-}
+        }  
 
 const styles = StyleSheet.create({
   container: {
@@ -177,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   freqButtonSelected: {
-    backgroundColor: '#aaa', // Different color to indicate selection
+    backgroundColor: 'green', // Different color to indicate selection
     padding: 10,
     margin: 5,
     borderRadius: 5,
@@ -185,15 +269,29 @@ const styles = StyleSheet.create({
   freqText: {
     fontSize: 16,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    padding: 10,
+  },
   scanButton: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: '#4CAF50',
     padding: 15,
-    paddingHorizontal: 30,
-    margin: 20,
-    elevation: 3,  // for Android shadow
-    shadowOpacity: 0.3,  // for iOS shadow
-    shadowRadius: 5,
-    shadowOffset: { height: 2, width: 0 },
+    borderRadius: 10,
+    flex: 1, // Take up half of the space
+    margin: 5,
+  },
+  exportButton: {
+    backgroundColor: '#008CBA',
+    padding: 15,
+    borderRadius: 10,
+    flex: 1, // Take up half of the space
+    margin: 5,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
