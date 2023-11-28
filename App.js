@@ -3,6 +3,7 @@ import { Text, View, StyleSheet, TouchableOpacity, TextInput, Alert } from 'reac
 import { Camera } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -13,8 +14,35 @@ export default function App() {
   const [userValidationData, setUserValidationData] = useState('');
   const [scanFrequency, setScanFrequency] = useState(null);
   const frequencies = [{ label: '30s', value: 30000 }, { label: '5m', value: 300000 }, { label: '10m', value: 600000 },{ label: '30m', value: 1800000 }];
-  const [scanComplete, setScanComplete] = useState(false); // New state
+  const [scanComplete, setScanComplete] = useState(false); // New statear
   const [selectedFrequency, setSelectedFrequency] = useState(null);
+  
+const saveScanningFrequency = async (frequency) => {
+  try {
+    await AsyncStorage.setItem('scanningFrequency', frequency.toString());
+  } catch (error) {
+    console.error('Error saving scanning frequency', error);
+  }
+};
+// Call this function when the user sets or changes the scanning frequency
+
+const loadScanningFrequency = async () => {
+  try {
+    const frequency = await AsyncStorage.getItem('scanningFrequency');
+    if (frequency !== null) {
+      setScanFrequency(parseInt(frequency, 10));
+      // Also update selectedFrequency if needed
+    }
+  } catch (error) {
+    console.error('Error loading scanning frequency', error);
+  }
+};
+
+// Call this function in a useEffect hook when the app component mounts
+useEffect(() => {
+  loadScanningFrequency();
+}, []);
+
   const getFinnishTimestamp = () => {
     return new Intl.DateTimeFormat('fi-FI', {
       year: 'numeric', 
@@ -33,6 +61,7 @@ export default function App() {
       setHasPermission(status === 'granted');
     })();
   }, []);
+  
 
   useEffect(() => {
     let intervalId;
@@ -145,15 +174,16 @@ const performLogDeletion = async () => {
   }
   const handleFrequencySelect = (value) => {
     if (scanFrequency === value) {
-      // If the selected frequency is already active, disable scanning
       setScanFrequency(null);
       setSelectedFrequency(null);
+      saveScanningFrequency('0'); // Indicate no frequency is selected
     } else {
-      // Otherwise, activate the selected frequency
       setScanFrequency(value);
       setSelectedFrequency(value);
+      saveScanningFrequency(value.toString()); // Save the selected frequency
     }
   };
+  
 
   const recordScanEvent = async (data, isValid) => {
     const logFileName = 'scan_events.txt';
@@ -197,8 +227,7 @@ const performLogDeletion = async () => {
             <Text style={styles.text}> Flip Camera </Text>
           </TouchableOpacity>
         </View>
-      </Camera>
-      
+      </Camera>    
       <View style={styles.controlPanel}>
         <TextInput
           style={styles.input}
@@ -210,18 +239,18 @@ const performLogDeletion = async () => {
       </View>
   
       <View style={styles.buttonRow}>
-      <TouchableOpacity onPress={initiateScan} style={styles.actionButton}>
+        <TouchableOpacity onPress={initiateScan} style={styles.actionButton}>
           <Text style={styles.buttonText}>Scan</Text>
         </TouchableOpacity>
-      <TouchableOpacity onPress={exportLogFile} style={styles.actionButton}>
+        <TouchableOpacity onPress={exportLogFile} style={styles.actionButton}>
           <Text style={styles.buttonText}>Export Log</Text>
         </TouchableOpacity>
-
-      {/* Delete Log Button */}
-      <TouchableOpacity onPress={deleteLogFile} style={styles.actionButton}>
-        <Text style={styles.buttonText}>Delete Log</Text>
-      </TouchableOpacity>
-    </View>
+  
+        {/* Delete Log Button */}
+        <TouchableOpacity onPress={deleteLogFile} style={styles.actionButton}>
+          <Text style={styles.buttonText}>Delete Log</Text>
+        </TouchableOpacity>
+      </View>
   
       <View style={styles.frequencyContainer}>
         {frequencies.map(freq => (
@@ -236,6 +265,8 @@ const performLogDeletion = async () => {
       </View>
     </View>
   );
+  
+  
         }  
 
 const styles = StyleSheet.create({
