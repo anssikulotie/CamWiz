@@ -78,6 +78,14 @@ const exportLogFile = async () => {
   const logFilePath = `${FileSystem.documentDirectory}${logFileName}`;
 
   try {
+    // Check if the log file exists
+    const fileInfo = await FileSystem.getInfoAsync(logFilePath);
+    if (!fileInfo.exists) {
+      Alert.alert("No Log File", "The log file does not exist.");
+      setIsSharing(false); // Reset sharing status
+      return;
+    }
+
     if (!(await Sharing.isAvailableAsync())) {
       Alert.alert("Sharing not available", "Unable to share files on this device.");
       setIsSharing(false); // Reset sharing status
@@ -92,6 +100,41 @@ const exportLogFile = async () => {
     setIsSharing(false); // Reset sharing status regardless of outcome
   }
 };
+
+const deleteLogFile = () => {
+  Alert.alert(
+    "Delete Log File",
+    "Are you sure you want to delete the log file? This action cannot be undone.",
+    [
+      { text: "Cancel", style: "cancel" },
+      { text: "OK", onPress: () => performLogDeletion() } // Call performLogDeletion on confirmation
+    ],
+    { cancelable: false }
+  );
+};
+
+const performLogDeletion = async () => {
+  const logFileName = 'scan_events.txt';
+  const logFilePath = `${FileSystem.documentDirectory}${logFileName}`;
+
+  try {
+    // Check if the log file exists
+    const fileInfo = await FileSystem.getInfoAsync(logFilePath);
+    if (!fileInfo.exists) {
+      Alert.alert("No Log File", "The log file does not exist and cannot be deleted.");
+      return;
+    }
+
+    // Proceed to delete the file
+    await FileSystem.deleteAsync(logFilePath);
+    Alert.alert("Log Deleted", "The log file has been successfully deleted.");
+  } catch (error) {
+    console.error('Error deleting log file:', error);
+    Alert.alert("Delete Error", "There was an error deleting the log file.");
+  }
+};
+
+
 
 
   if (hasPermission === null) {
@@ -167,13 +210,18 @@ const exportLogFile = async () => {
       </View>
   
       <View style={styles.buttonRow}>
-        <TouchableOpacity onPress={initiateScan} style={styles.scanButton}>
-          <Text style={styles.buttonText}>Scan Once</Text>
+      <TouchableOpacity onPress={initiateScan} style={styles.actionButton}>
+          <Text style={styles.buttonText}>Scan</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={exportLogFile} style={styles.exportButton}>
-          <Text style={styles.buttonText}>Export Log File</Text>
+      <TouchableOpacity onPress={exportLogFile} style={styles.actionButton}>
+          <Text style={styles.buttonText}>Export Log</Text>
         </TouchableOpacity>
-      </View>
+
+      {/* Delete Log Button */}
+      <TouchableOpacity onPress={deleteLogFile} style={styles.actionButton}>
+        <Text style={styles.buttonText}>Delete Log</Text>
+      </TouchableOpacity>
+    </View>
   
       <View style={styles.frequencyContainer}>
         {frequencies.map(freq => (
@@ -269,24 +317,17 @@ const styles = StyleSheet.create({
   freqText: {
     fontSize: 16,
   },
-  buttonRow: {
+buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     padding: 10,
   },
-  scanButton: {
+  actionButton: {
     backgroundColor: '#4CAF50',
-    padding: 15,
+    padding: 10,
     borderRadius: 10,
-    flex: 1, // Take up half of the space
-    margin: 5,
-  },
-  exportButton: {
-    backgroundColor: '#008CBA',
-    padding: 15,
-    borderRadius: 10,
-    flex: 1, // Take up half of the space
+    flex: 1, // Adjust as necessary
     margin: 5,
   },
   buttonText: {
