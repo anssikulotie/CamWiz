@@ -16,7 +16,8 @@ export default function App() {
   const frequencies = [{ label: '30s', value: 30000 }, { label: '5m', value: 300000 }, { label: '10m', value: 600000 },{ label: '30m', value: 1800000 }];
   const [scanComplete, setScanComplete] = useState(false); // New statear
   const [selectedFrequency, setSelectedFrequency] = useState(null);
-  
+  const [scanTimer, setScanTimer] = useState(null);
+
 const saveScanningFrequency = async (frequency) => {
   try {
     await AsyncStorage.setItem('scanningFrequency', frequency.toString());
@@ -45,6 +46,14 @@ useEffect(() => {
   loadScanningFrequency();
 }, []);
 
+useEffect(() => {
+  return () => {
+    if (scanTimer) {
+      clearTimeout(scanTimer);
+    }
+  };
+}, [scanTimer]);
+
   const getFinnishTimestamp = () => {
     return new Intl.DateTimeFormat('fi-FI', {
       year: 'numeric', 
@@ -70,6 +79,7 @@ useEffect(() => {
     if (scanFrequency) {
       intervalId = setInterval(() => {
         setScanned(false); // Allow for a new scan
+        initiateScan(); // Initiate scanning and start timeout timer
         setType(prevType => // Switch camera type
           prevType === Camera.Constants.Type.back 
           ? Camera.Constants.Type.front 
@@ -77,25 +87,53 @@ useEffect(() => {
         );
       }, scanFrequency);
     }
-    return () => clearInterval(intervalId);
-  }, [scanFrequency]);
+    return () => {
+      clearInterval(intervalId);
+      if (scanTimer) {
+        clearTimeout(scanTimer);
+      }
+    };
+  }, [scanFrequency, scanTimer]);
 
-  const handleBarCodeScanned = ({ type, data }) => {
+  const handleBarCodeScanned = ({ type: scannedType, data }) => {
+    clearTimeout(scanTimer); // Clear the timeout timer
+    setScanTimer(null);
     setScanned(true);
     setScannedData(data);
     let isValid = data === defaultValidationData || data === userValidationData;
-    
-    // Use the state variable 'type' to determine the camera used
+  
+    // Determine the camera used based on the current state of 'type'
     let cameraUsed = type === Camera.Constants.Type.back ? 'Back Camera' : 'Front Camera';
   
     recordScanEvent(data, isValid, cameraUsed);
   
-    Alert.alert('Barcode Scanned', `Camera: ${cameraUsed}\nType: ${type}\nData: ${data}\nMatch: ${isValid ? 'Valid' : 'Invalid'}`);
+    // Update alert to show the correct camera
+    Alert.alert('Barcode Scanned', `Camera: ${cameraUsed}\nType: ${scannedType}\nData: ${data}\nMatch: ${isValid ? 'Valid' : 'Invalid'}`);
   };
+  
+  
+  
   
 
   const initiateScan = () => {
     setScanned(false); // Reset scanned state to allow a new scan
+  
+    // Start a timer for 20 seconds
+    const timer = setTimeout(() => {
+      // Handle timeout
+      handleScanTimeout();
+    }, 20000); // 20 seconds
+  
+    setScanTimer(timer);
+  };
+
+  const handleScanTimeout = () => {
+    Alert.alert("Scan Failed", "No barcode was scanned within 20 seconds.");
+    // Record the timeout event in the log
+    recordScanEvent("Timeout", false, "Timeout");
+    // Reset the scan state
+    setScanned(true);
+    setScanTimer(null);
   };
 
   const [isSharing, setIsSharing] = useState(false); // State to track sharing status
