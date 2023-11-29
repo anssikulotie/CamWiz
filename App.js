@@ -85,11 +85,14 @@ useEffect(() => {
     setScannedData(data);
     let isValid = data === defaultValidationData || data === userValidationData;
     
-    // Record the scan event
-    recordScanEvent(data, isValid);
+    // Use the state variable 'type' to determine the camera used
+    let cameraUsed = type === Camera.Constants.Type.back ? 'Back Camera' : 'Front Camera';
   
-    Alert.alert('Barcode Scanned', `Type: ${type}\nData: ${data}\nMatch: ${isValid ? 'Valid' : 'Invalid'}`);
+    recordScanEvent(data, isValid, cameraUsed);
+  
+    Alert.alert('Barcode Scanned', `Camera: ${cameraUsed}\nType: ${type}\nData: ${data}\nMatch: ${isValid ? 'Valid' : 'Invalid'}`);
   };
+  
 
   const initiateScan = () => {
     setScanned(false); // Reset scanned state to allow a new scan
@@ -190,23 +193,23 @@ const performLogDeletion = async () => {
   const recordScanEvent = async (data, isValid) => {
     const logFileName = 'scan_events.txt';
     const logFilePath = `${FileSystem.documentDirectory}${logFileName}`;
-    const timestamp = getFinnishTimestamp(); // Finnish formatted timestamp
-    const newLogEntry = `${timestamp}, Status: ${isValid ? 'Valid' : 'Invalid'}, Data: ${data}\n`;
+    const timestamp = getFinnishTimestamp();
+    
+    // Determine the camera used based on the 'type' state
+    const cameraUsed = type === Camera.Constants.Type.back ? 'Back Camera' : 'Front Camera';
+    
+    const logEntry = `${timestamp}, Camera: ${cameraUsed}, Status: ${isValid ? 'Valid' : 'Invalid'}, Data: ${data}\n`;
   
     try {
-      // Read existing content
-      const existingContent = await FileSystem.readAsStringAsync(logFilePath)
-        .catch(() => ''); // If the file doesn't exist, start with an empty string
-  
-      // Concatenate new entry with existing content
-      const updatedContent = existingContent + newLogEntry;
-  
-      // Write the updated content back to the file
+      // Read existing content and append the new log entry
+      const existingContent = await FileSystem.readAsStringAsync(logFilePath).catch(() => '');
+      const updatedContent = existingContent + logEntry;
       await FileSystem.writeAsStringAsync(logFilePath, updatedContent);
     } catch (error) {
       console.error('Error writing scan event:', error);
     }
   };
+  
   
   
 
