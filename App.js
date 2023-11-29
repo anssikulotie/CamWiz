@@ -30,8 +30,10 @@ const loadScanningFrequency = async () => {
   try {
     const frequency = await AsyncStorage.getItem('scanningFrequency');
     if (frequency !== null) {
-      setScanFrequency(parseInt(frequency, 10));
-      // Also update selectedFrequency if needed
+      const freqValue = parseInt(frequency, 10);
+      setScanFrequency(freqValue);
+      // Update selectedFrequency to reflect the loaded frequency
+      setSelectedFrequency(freqValue > 0 ? freqValue : null);
     }
   } catch (error) {
     console.error('Error loading scanning frequency', error);
